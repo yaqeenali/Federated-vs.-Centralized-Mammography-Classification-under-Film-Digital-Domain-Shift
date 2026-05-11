@@ -1,0 +1,59 @@
+# Configuration — Federated vs Centralized Mammography Classification
+# Ali et al., Front. Digit. Health 8:1715858, doi: 10.3389/fdgth.2026.1715858
+
+data:
+  manifest_csvs:
+    - data/manifests/cbis_manifest.csv
+    - data/manifests/vindr_manifest.csv
+  cbis_dir:   /data/cbis-ddsm        # raw CBIS-DDSM directory
+  vindr_dir:  /data/vindr-mammo      # raw VinDr-Mammo directory
+
+preprocessing:
+  input_size_default:   224          # default (Section 2.2.3)
+  input_size_ablation:  324          # resolution ablation (Table 6)
+  imagenet_mean: [0.485, 0.456, 0.406]
+  imagenet_std:  [0.229, 0.224, 0.225]
+  val_fraction:  0.15               # 15% stratified val split (Table 1 note)
+
+augmentation:                        # Section 2.2.4 — training only
+  random_hflip_p:      0.5
+  random_rotation_deg: 15
+  gaussian_blur_kernel: 5
+  gaussian_blur_sigma:  [0.1, 1.5]
+  gaussian_blur_p:      0.2
+
+training:                            # Section 2.6.3
+  optimizer:     sgd
+  lr:            0.01
+  momentum:      0.9                 # 0.0 for SCAFFOLD local SGD
+  weight_decay:  0.0001
+  batch_size:    32
+  epochs:        100                 # for centralized / local-only
+  mixed_precision: true              # torch.amp with gradient scaling
+
+federated:                           # Section 2.6.4 & 2.6.5
+  num_rounds:    100
+  local_epochs:  3                   # E=3 epochs per round
+  clients:
+    - cbis                           # Client 1: CBIS-DDSM (scanned film)
+    - vindr                          # Client 2: VinDr-Mammo (FFDM)
+  aggregation:   sample_weighted     # sample-size–weighted (FedAvg, FedProx, SCAFFOLD)
+
+algorithms:
+  fedprox_mu:    0.01                # proximal regularizer strength (Section 2.4)
+
+evaluation:                          # Section 2.5
+  threshold:     0.5                 # fixed threshold for ACC, F1, Prec, Rec
+  n_bootstrap:   1000               # bootstrap replicates (Section 2.5.4)
+  ci_percentiles: [2.5, 97.5]       # 95% percentile interval
+  target_recall: 0.90               # Prec@Rec=0.90 (Section 2.5.2)
+  model_selection: val_auroc        # checkpoint selection criterion (Section 2.5.3)
+
+reproducibility:                    # Section 2.6.7
+  seeds: [42, 123, 456]             # three fixed seeds
+  cudnn_deterministic: true
+  cudnn_benchmark: false            # disabled for determinism
+
+output:
+  results_dir: results/
+  figures_dir: figures/
